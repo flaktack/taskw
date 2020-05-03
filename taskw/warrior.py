@@ -14,6 +14,7 @@ import codecs
 import copy
 from distutils.version import LooseVersion
 import logging
+import io
 import os
 import time
 import uuid
@@ -57,8 +58,6 @@ class TaskWarriorBase(with_metaclass(abc.ABCMeta, object)):
         config_overrides=None,
         marshal=False
     ):
-        self.config_filename = config_filename
-        self.config = TaskWarriorBase.load_config(config_filename)
         if marshal:
             raise NotImplementedError(
                 "You must use TaskWarriorShellout to use 'marshal'"
@@ -67,6 +66,9 @@ class TaskWarriorBase(with_metaclass(abc.ABCMeta, object)):
             raise NotImplementedError(
                 "You must use TaskWarriorShellout to use 'config_overrides'"
             )
+        self.config_filename = config_filename
+        self.config_overrides = config_overrides if config_overrides else {}
+        self.config = self.load_config()
 
     def _stub_task(self, description, tags=None, **kw):
         """ Given a description, stub out a task dict. """
@@ -165,18 +167,9 @@ class TaskWarriorBase(with_metaclass(abc.ABCMeta, object)):
         filtered = filter(func, tasks)
         return filtered
 
-    @classmethod
-    def load_config(cls, config_filename=TASKRC, overrides=None):
-        """ Load ~/.taskrc into a python dict
-
-        >>> config = TaskWarrior.load_config()
-        >>> config['data']['location']
-        '/home/threebean/.task'
-        >>> config['_forcecolor']
-        'yes'
-
-        """
-        return TaskRc(config_filename, overrides=overrides)
+    @abc.abstractmethod
+    def load_config(self):
+        pass
 
     @abc.abstractmethod
     def task_start(self, **kw):
@@ -196,6 +189,24 @@ class TaskWarriorDirect(TaskWarriorBase):
     See https://github.com/ralphbean/taskw/pull/15 for discussion
     and https://github.com/ralphbean/taskw/issues/30 for more.
     """
+
+    def load_config(self):
+        """ Load ~/.taskrc into a python dict
+
+        >>> tw = TaskWarrior()
+        >>> tw.config['data']['location']
+        '/home/threebean/.task'
+        >>> tw.config['_forcecolor']
+        'yes'
+
+        """
+        path = os.path.normpath(
+            os.path.expanduser(
+                self.config_filename
+            )
+        )
+        with codecs.open(path, 'r', 'utf8') as config_file:
+            return TaskRc(config_file)
 
     def context(self):
         raise NotImplementedError(
@@ -431,12 +442,22 @@ class TaskWarriorShellout(TaskWarriorBase):
         marshal=False,
     ):
         super(TaskWarriorShellout, self).__init__(config_filename)
-        self.config_overrides = config_overrides if config_overrides else {}
         self._marshal = marshal
-        self.config = TaskRc(config_filename, overrides=config_overrides)
 
         if self.get_version() >= LooseVersion('2.4'):
             self.DEFAULT_CONFIG_OVERRIDES['verbose'] = 'new-uuid'
+
+    def load_config(self):
+        """ Load ~/.taskrc into a python dict
+
+        >>> tw = TaskWarrior()
+        >>> tw.config['data']['location']
+        '/home/threebean/.task'
+        >>> tw.config['_forcecolor']
+        'yes'
+
+        """
+        return TaskRc(io.StringIO(self._execute("_show")[0]))
 
     def get_configuration_override_args(self):
         config_overrides = self.DEFAULT_CONFIG_OVERRIDES.copy()
@@ -487,11 +508,11 @@ class TaskWarriorShellout(TaskWarriorBase):
         # made it in.. so we need to be able to handle (or at least try to
         # handle) whatever.  Kitchen tries its best.
         try:
-            stdout = stdout.decode(self.config.get('encoding', 'utf-8'))
+            stdout = stdout.decode('utf-8')
         except UnicodeDecodeError as e:
             stdout = kitchen.text.converters.to_unicode(stdout)
         try:
-            stderr = stderr.decode(self.config.get('encoding', 'utf-8'))
+            stderr = stderr.decode('utf-8')
         except UnicodeDecodeError as e:
             stderr = kitchen.text.converters.to_unicode(stderr)
 

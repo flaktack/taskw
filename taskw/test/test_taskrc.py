@@ -1,3 +1,4 @@
+import codecs
 import os
 import sys
 
@@ -14,6 +15,7 @@ else:
 
 class TestBasicLoading(TestCase):
     def setUp(self):
+        self.maxDiff = None
         self.path_to_taskrc = os.path.join(
             os.path.dirname(__file__),
             'data/default.taskrc',
@@ -21,33 +23,44 @@ class TestBasicLoading(TestCase):
 
     def test_load_config(self):
         expected = {
-            'data': {
+            'data.': {
                 'location': '~/.task'
             },
-            'alpha': {
+            'alpha': '12',
+            'alpha.': {
                 'one': 'yes',
                 'two': '2',
             },
-            'beta': {
+            'beta.': {
                 'one': 'FALSE',
             },
-            'gamma': {
+            'gamma.': {
                 'one': 'TRUE',
             },
-            'uda': {
-                'a': {
+            'omega.': {
+                'one': 'X=X=X='
+            },
+            'uda.': {
+                'a.': {
                     'type': 'numeric',
                     'label': 'Alpha',
                 },
-                'b': {
+                'b.': {
                     'type': 'string',
                     'label': 'Beta',
                     'values': 'Strontium-90,Hydrogen-3',
+                },
+                'priority.': {
+                    'label': 'Priority',
+                    'type': 'string',
+                    'values': 'H,M,L,'
                 }
             }
         }
-        config = TaskWarrior.load_config(self.path_to_taskrc)
-        self.assertEqual(config, expected)
+
+        config = TaskWarrior(self.path_to_taskrc).config
+        subset = {k: v for k, v in config.items() if k in expected}
+        self.assertEqual(subset, expected)
 
 
 class TestTaskRc(TestCase):
@@ -56,29 +69,34 @@ class TestTaskRc(TestCase):
             os.path.dirname(__file__),
             'data/default.taskrc',
         )
-        self.taskrc = TaskRc(self.path_to_taskrc)
+        with codecs.open(self.path_to_taskrc, 'r', 'utf8') as config_file:
+            self.taskrc = TaskRc(config_file)
 
     def test_taskrc_parsing(self):
         expected_config = {
-            'data': {
+            'data.': {
                 'location': '~/.task'
             },
-            'alpha': {
+            'alpha': '12',
+            'alpha.': {
                 'one': 'yes',
                 'two': '2',
             },
-            'beta': {
+            'beta.': {
                 'one': 'FALSE',
             },
-            'gamma': {
+            'gamma.': {
                 'one': 'TRUE',
             },
-            'uda': {
-                'a': {
+            'omega.': {
+                'one': 'X=X=X='
+            },
+            'uda.': {
+                'a.': {
                     'type': 'numeric',
                     'label': 'Alpha',
                 },
-                'b': {
+                'b.': {
                     'type': 'string',
                     'label': 'Beta',
                     'values': 'Strontium-90,Hydrogen-3',
@@ -99,51 +117,3 @@ class TestTaskRc(TestCase):
         actual_udas = self.taskrc.get_udas()
 
         self.assertEqual(actual_udas, expected_udas)
-
-    def test_config_overrides(self):
-        overrides = {
-            'uda': {
-                'd': {
-                    'type': 'string',
-                    'label': 'Delta',
-                }
-            },
-            'alpha': {
-                'two': '3',
-            }
-        }
-
-        taskrc = TaskRc(self.path_to_taskrc, overrides=overrides)
-
-        expected_config = {
-            'data': {
-                'location': '~/.task'
-            },
-            'alpha': {
-                'one': 'yes',
-                'two': '3',
-            },
-            'beta': {
-                'one': 'FALSE',
-            },
-            'gamma': {
-                'one': 'TRUE',
-            },
-            'uda': {
-                'a': {
-                    'type': 'numeric',
-                    'label': 'Alpha',
-                },
-                'b': {
-                    'type': 'string',
-                    'label': 'Beta',
-                    'values': 'Strontium-90,Hydrogen-3',
-                },
-                'd': {
-                    'type': 'string',
-                    'label': 'Delta',
-                }
-            }
-        }
-
-        self.assertEqual(taskrc, expected_config)
