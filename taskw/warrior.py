@@ -197,6 +197,11 @@ class TaskWarriorDirect(TaskWarriorBase):
     and https://github.com/ralphbean/taskw/issues/30 for more.
     """
 
+    def context(self):
+        raise NotImplementedError(
+            "You must use TaskWarriorShellout to use 'context'"
+        )
+
     def sync(self):
         raise NotImplementedError(
             "You must use TaskWarriorShellout to use 'sync'"
@@ -558,6 +563,16 @@ class TaskWarriorShellout(TaskWarriorBase):
                 raise OSError("Unable to find the 'task' command-line tool.")
             raise
         return LooseVersion(taskwarrior_version.decode())
+
+    def context(self, name):
+        if self.get_version() < LooseVersion('2.4.2'):
+            raise UnsupportedVersionException(
+                "'context' requires version 2.4.2 of taskwarrior or later."
+            )
+        if name:
+            self._execute('context', name)
+        else:
+            self._execute('context', 'none')
 
     def sync(self, init=False):
         if self.get_version() < LooseVersion('2.3'):
