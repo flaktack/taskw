@@ -108,7 +108,7 @@ def encode_query(value, version, query=True):
                 )
             else:
                 args.append(
-                    '%s:%s' % (
+                    '%s:"%s"' % (
                         k,
                         encode_task_value(k, v, query=query)
                     )
